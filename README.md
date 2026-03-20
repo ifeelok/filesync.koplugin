@@ -95,16 +95,14 @@ If you see the menu entry, the plugin is installed correctly.
 
 ### Managing Files
 
-| Action | How |
-|--------|-----|
-| **Browse** | Tap folders to navigate, use breadcrumbs to go back |
-| **Upload** | Tap the upload button or drag files onto the drop zone |
-| **Download** | Tap the download icon on any file |
-| **New Folder** | Tap the folder+ button in the header |
-| **Rename** | Tap the pencil icon on any file or folder |
-| **Delete** | Tap the trash icon (confirmation required) |
-| **Search** | Type in the search bar to filter files by name |
-| **Sort** | Use the sort dropdown to change ordering |
+Once connected, the web interface lets you:
+
+- **Browse** — Tap folders to navigate your library. Use the breadcrumb bar at the top to jump back to any parent directory.
+- **Upload** — Tap the **Upload** button in the header, then choose files or drag them into the drop zone. Multiple files can be uploaded at once.
+- **File details** — Tap any file to open its detail view, where you can **download**, **rename**, or **delete** it.
+- **Create folders** — Tap the **Folder** button in the header and enter a name.
+- **Search** — Use the search bar to filter the current directory by filename.
+- **Sort** — Use the dropdown to sort by name, date, size, or type in ascending or descending order.
 
 ### Stopping the Server
 

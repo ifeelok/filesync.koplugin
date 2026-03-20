@@ -235,6 +235,17 @@ function FileOps:listDirectory(rel_path, sort_by, sort_order, filter, safe_mode)
                                     modified = entry_attr.modification or 0,
                                     type = is_dir and "directory" or self:_getFileType(name),
                                 }
+                                -- For directories, check if they are empty
+                                if is_dir then
+                                    local child_count = 0
+                                    for child_name in lfs.dir(entry_path) do
+                                        if child_name ~= "." and child_name ~= ".." then
+                                            child_count = child_count + 1
+                                            break -- only need to know if > 0
+                                        end
+                                    end
+                                    entry.is_empty = (child_count == 0)
+                                end
                                 -- For non-directory files, check if a corresponding .sdr directory exists
                                 if not is_dir then
                                     local sdr_attr = lfs.attributes(entry_path .. ".sdr")
@@ -539,10 +550,20 @@ function FileOps:delete(rel_path, options)
     local is_file = attr.mode ~= "directory"
 
     if attr.mode == "directory" then
-        -- Recursively delete directory contents
-        local ok, del_err = self:_deleteRecursive(full_path)
+        -- Only allow deletion of empty directories (safety measure)
+        local child_count = 0
+        for child_name in lfs.dir(full_path) do
+            if child_name ~= "." and child_name ~= ".." then
+                child_count = child_count + 1
+                break
+            end
+        end
+        if child_count > 0 then
+            return false, "Cannot delete non-empty directory"
+        end
+        local ok, del_err = lfs.rmdir(full_path)
         if not ok then
-            return false, del_err
+            return false, "Cannot delete directory: " .. tostring(del_err)
         end
     else
         local ok, del_err = os.remove(full_path)

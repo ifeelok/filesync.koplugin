@@ -1076,6 +1076,7 @@ html, body {
             network_error: "Network error",
             delete_file: "Delete file",
             delete_folder: "Delete folder",
+            delete_empty_folder: "Delete empty folder",
             confirm_delete: "Are you sure you want to delete",
             confirm_delete_contents: "This will delete all contents inside.",
             unknown: "Unknown",
@@ -1132,6 +1133,7 @@ html, body {
             network_error: "Error de red",
             delete_file: "Eliminar archivo",
             delete_folder: "Eliminar carpeta",
+            delete_empty_folder: "Eliminar carpeta vac\u00eda",
             confirm_delete: "\u00bfEst\u00e1s seguro de que quieres eliminar",
             confirm_delete_contents: "Esto eliminar\u00e1 todo el contenido.",
             unknown: "Desconocido",
@@ -1306,7 +1308,9 @@ html, body {
             if (entry.is_dir) {
                 html += '<div class="file-actions">';
                 html += '<button class="btn-icon" onclick="event.stopPropagation(); renameItem(\'' + escapeAttr(entry.path) + '\', \'' + escapeAttr(entry.name) + '\')" title="' + escapeHtml(t('rename')) + '">' + icons.rename + '</button>';
-                html += '<button class="btn-icon" onclick="event.stopPropagation(); deleteItem(\'' + escapeAttr(entry.path) + '\', \'' + escapeAttr(entry.name) + '\', true)" title="' + escapeHtml(t('delete_label')) + '">' + icons.trash + '</button>';
+                if (entry.is_empty) {
+                    html += '<button class="btn-icon" onclick="event.stopPropagation(); deleteItem(\'' + escapeAttr(entry.path) + '\', \'' + escapeAttr(entry.name) + '\', true)" title="' + escapeHtml(t('delete_label')) + '">' + icons.trash + '</button>';
+                }
                 html += '</div>';
             } else {
                 html += '<div class="file-actions"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--text-tertiary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></div>';
@@ -1350,8 +1354,8 @@ html, body {
     };
 
     window.deleteItem = function(path, name, isDir, hasSdr) {
-        var titleStr = isDir ? t('delete_folder') : t('delete_file');
-        var msgStr = t('confirm_delete') + ' "' + escapeHtml(name) + '"?' + (isDir ? ' ' + t('confirm_delete_contents') : '');
+        var titleStr = isDir ? t('delete_empty_folder') : t('delete_file');
+        var msgStr = t('confirm_delete') + ' "' + escapeHtml(name) + '"?';
         var showSdrCheckbox = !isDir && hasSdr;
         showConfirm(
             titleStr,
