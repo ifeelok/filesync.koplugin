@@ -1,8 +1,22 @@
+local Blitbuffer = require("ffi/blitbuffer")
+local CenterContainer = require("ui/widget/container/centercontainer")
+local ConfirmBox = require("ui/widget/confirmbox")
 local Device = require("device")
+local FrameContainer = require("ui/widget/container/framecontainer")
+local GestureRange = require("ui/gesturerange")
 local InfoMessage = require("ui/widget/infomessage")
+local InputContainer = require("ui/widget/container/inputcontainer")
 local NetworkMgr = require("ui/network/manager")
+local QRWidget = require("ui/widget/qrwidget")
+local Size = require("ui/size")
+local TextBoxWidget = require("ui/widget/textboxwidget")
+local TextWidget = require("ui/widget/textwidget")
 local UIManager = require("ui/uimanager")
+local VerticalGroup = require("ui/widget/verticalgroup")
+local VerticalSpan = require("ui/widget/verticalspan")
+local Font = require("ui/font")
 local logger = require("logger")
+local Screen = Device.screen
 local _ = require("gettext")
 local T = require("ffi/util").template
 
@@ -12,6 +26,8 @@ local FileSyncManager = {
     _port = nil,
     _ip = nil,
     _was_running_before_suspend = false,
+    _standby_prevented = false,
+    _qr_widget = nil,
 }
 
 local DEFAULT_PORT = 8080
@@ -208,6 +224,7 @@ function FileSyncManager:start(silent)
     self._running = true
     self._ip = ip
     self._port = port
+    self:preventStandby()
     logger.info("FileSync: Server started on", ip .. ":" .. port)
 
     if not silent then
@@ -219,6 +236,9 @@ function FileSyncManager:stop(silent)
     if not self._running then
         return
     end
+
+    -- Close QR screen if open
+    self:closeQRScreen()
 
     if self._server then
         pcall(function()
@@ -233,6 +253,7 @@ function FileSyncManager:stop(silent)
     end
 
     self._running = false
+    self:allowStandby()
     logger.info("FileSync: Server stopped")
 
     if not silent then
@@ -240,6 +261,50 @@ function FileSyncManager:stop(silent)
             text = _("FileSync server stopped."),
             timeout = 2,
         })
+        UIManager:restartKOReader()
+    end
+end
+
+function FileSyncManager:preventStandby()
+    if not self._standby_prevented then
+        UIManager:preventStandby()
+        self._standby_prevented = true
+        logger.info("FileSync: Standby prevented")
+    end
+end
+
+function FileSyncManager:allowStandby()
+    if self._standby_prevented then
+        UIManager:allowStandby()
+        self._standby_prevented = false
+        logger.info("FileSync: Standby allowed")
+    end
+end
+
+function FileSyncManager:checkBatteryAndStart()
+    local power_device = Device:getPowerDevice()
+    local capacity = power_device:getCapacity()
+    local is_plugged = Device:isPluggedIn()
+
+    if capacity < 15 and not is_plugged then
+        UIManager:show(ConfirmBox:new{
+            title = _("Low Battery"),
+            text = T(_("Battery level is at %1%. Running the server may drain the battery quickly."), capacity),
+            ok_text = _("Start Anyway"),
+            cancel_text = _("Cancel"),
+            ok_callback = function()
+                self:start()
+            end,
+        })
+    else
+        self:start()
+    end
+end
+
+function FileSyncManager:closeQRScreen()
+    if self._qr_widget then
+        UIManager:close(self._qr_widget)
+        self._qr_widget = nil
     end
 end
 
@@ -252,14 +317,141 @@ function FileSyncManager:showQRCode()
         return
     end
 
+    -- Close any existing QR screen first
+    self:closeQRScreen()
+
     local url = "http://" .. self._ip .. ":" .. self._port
-    local QRMessage = require("ui/widget/qrmessage")
-    local Screen = Device.screen
-    UIManager:show(QRMessage:new{
+    local screen_width = Screen:getWidth()
+    local screen_height = Screen:getHeight()
+
+    -- Build the QR code widget
+    local qr_size = Screen:scaleBySize(200)
+    local qr_widget = QRWidget:new{
         text = url,
-        width = Screen:scaleBySize(280),
-        height = Screen:scaleBySize(280),
-    })
+        width = qr_size,
+        height = qr_size,
+    }
+
+    -- Title
+    local title_widget = TextWidget:new{
+        text = "FileSync",
+        face = Font:getFace("infofont", 36),
+        fgcolor = Blitbuffer.COLOR_BLACK,
+        max_width = screen_width - Screen:scaleBySize(40),
+    }
+
+    -- URL text
+    local url_widget = TextWidget:new{
+        text = url,
+        face = Font:getFace("infofont", 20),
+        fgcolor = Blitbuffer.COLOR_BLACK,
+        max_width = screen_width - Screen:scaleBySize(40),
+    }
+
+    -- Instructions text
+    local instructions_widget = TextBoxWidget:new{
+        text = _("Scan the QR code or enter the URL in your browser. Both devices must be on the same WiFi network."),
+        face = Font:getFace("smallinfofont", 16),
+        width = screen_width - Screen:scaleBySize(80),
+        alignment = "center",
+        fgcolor = Blitbuffer.COLOR_BLACK,
+    }
+
+    -- Stop Server button
+    local button_text = TextWidget:new{
+        text = _("Stop Server"),
+        face = Font:getFace("infofont", 20),
+        fgcolor = Blitbuffer.COLOR_BLACK,
+    }
+    local stop_button = FrameContainer:new{
+        bordersize = Size.border.button,
+        radius = Size.radius.button,
+        padding = Screen:scaleBySize(10),
+        padding_left = Screen:scaleBySize(30),
+        padding_right = Screen:scaleBySize(30),
+        background = Blitbuffer.COLOR_WHITE,
+        button_text,
+    }
+
+    -- Vertical layout
+    local vertical_content = VerticalGroup:new{
+        align = "center",
+        VerticalSpan:new{ width = Screen:scaleBySize(40) },
+        title_widget,
+        VerticalSpan:new{ width = Screen:scaleBySize(30) },
+        qr_widget,
+        VerticalSpan:new{ width = Screen:scaleBySize(20) },
+        url_widget,
+        VerticalSpan:new{ width = Screen:scaleBySize(15) },
+        instructions_widget,
+        VerticalSpan:new{ width = Screen:scaleBySize(30) },
+        stop_button,
+    }
+
+    -- Center everything on screen
+    local centered_content = CenterContainer:new{
+        dimen = { w = screen_width, h = screen_height },
+        vertical_content,
+    }
+
+    -- Full-screen white background container
+    local frame = FrameContainer:new{
+        width = screen_width,
+        height = screen_height,
+        bordersize = 0,
+        padding = 0,
+        margin = 0,
+        background = Blitbuffer.COLOR_WHITE,
+        centered_content,
+    }
+
+    -- Build the InputContainer for handling taps
+    local widget = InputContainer:new{
+        width = screen_width,
+        height = screen_height,
+    }
+    widget[1] = frame
+
+    -- Compute button geometry for hit testing
+    -- We store the button reference so we can check tap position later
+    widget._stop_button = stop_button
+    widget._manager = self
+
+    widget.ges_events = {
+        Tap = {
+            GestureRange:new{
+                ges = "tap",
+                range = { x = 0, y = 0, w = screen_width, h = screen_height },
+            },
+        },
+    }
+
+    function widget:onTap(_, ges)
+        -- Check if the tap is on the Stop Server button
+        local btn = self._stop_button
+        if btn.dimen and ges then
+            local x, y = ges.pos.x, ges.pos.y
+            if x >= btn.dimen.x and x <= btn.dimen.x + btn.dimen.w
+               and y >= btn.dimen.y and y <= btn.dimen.y + btn.dimen.h then
+                -- Stop button tapped: stop server and restart KOReader
+                self._manager:closeQRScreen()
+                self._manager:stop(true)
+                UIManager:restartKOReader()
+                return true
+            end
+        end
+        -- Tap elsewhere: dismiss QR screen, keep server running
+        self._manager:closeQRScreen()
+        return true
+    end
+
+    function widget:onClose()
+        self._manager:closeQRScreen()
+        return true
+    end
+
+    self._qr_widget = widget
+    UIManager:show(widget, "full")
 end
 
 function FileSyncManager:openKindleFirewall(port)

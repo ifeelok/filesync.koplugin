@@ -29,7 +29,7 @@ function FileSync:addToMainMenu(menu_items)
                     if FileSyncManager:isRunning() then
                         FileSyncManager:stop()
                     else
-                        FileSyncManager:start()
+                        FileSyncManager:checkBatteryAndStart()
                     end
                 end,
                 keep_menu_open = false,
