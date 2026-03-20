@@ -723,6 +723,167 @@ html, body {
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+/* ===== File Detail View ===== */
+.file-detail {
+    position: fixed;
+    inset: 0;
+    background: var(--surface);
+    z-index: 150;
+    overflow-y: auto;
+    display: none;
+}
+
+.file-detail.open {
+    display: block;
+}
+
+.detail-header {
+    position: sticky;
+    top: 0;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 16px;
+    z-index: 10;
+}
+
+.detail-header-inner {
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.detail-content {
+    max-width: 480px;
+    margin: 0 auto;
+    padding: 24px 16px;
+}
+
+.detail-cover {
+    width: 200px;
+    height: 280px;
+    margin: 0 auto 24px;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #f1f5f9;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: var(--shadow-md);
+}
+
+.detail-cover img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.detail-cover .cover-placeholder {
+    color: var(--text-tertiary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.detail-cover .cover-placeholder svg {
+    width: 64px;
+    height: 64px;
+}
+
+.detail-cover .cover-spinner {
+    width: 28px;
+    height: 28px;
+    border: 3px solid var(--border);
+    border-top-color: var(--primary);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+}
+
+.detail-title {
+    font-size: 20px;
+    font-weight: 700;
+    text-align: center;
+    margin-bottom: 4px;
+    word-break: break-word;
+    color: var(--text);
+}
+
+.detail-author {
+    font-size: 15px;
+    color: var(--text-secondary);
+    text-align: center;
+    margin-bottom: 24px;
+}
+
+.detail-info {
+    background: var(--bg);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 24px;
+}
+
+.detail-info-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 0;
+}
+
+.detail-info-row:not(:last-child) {
+    border-bottom: 1px solid var(--border-light);
+}
+
+.detail-info-label {
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+.detail-info-value {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text);
+    text-align: right;
+    word-break: break-word;
+    max-width: 60%;
+}
+
+.detail-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.detail-actions .btn {
+    flex: 1;
+    min-width: 100px;
+    padding: 12px 16px;
+    font-size: 14px;
+    justify-content: center;
+}
+
+.detail-ext-suffix {
+    display: inline-block;
+    padding: 10px 14px;
+    font-size: 15px;
+    color: var(--text-tertiary);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-left: none;
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    line-height: 1.5;
+    white-space: nowrap;
+}
+
+.modal-input-with-ext {
+    display: flex;
+    margin-bottom: 16px;
+}
+
+.modal-input-with-ext .modal-input {
+    margin-bottom: 0;
+    border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+    flex: 1;
+    min-width: 0;
+}
 </style>
 </head>
 <body>
@@ -794,8 +955,8 @@ html, body {
             Drag and drop files here, or <strong onclick="document.getElementById('fileInput').click()">browse</strong>
         </div>
         <input type="file" id="fileInput" multiple style="display:none" onchange="handleFileSelect(this.files)">
-        <button class="btn btn-primary btn-sm" onclick="document.getElementById('fileInput').click()">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <button class="btn btn-primary" onclick="document.getElementById('fileInput').click()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                 <line x1="12" y1="5" x2="12" y2="19"/>
                 <line x1="5" y1="12" x2="19" y2="12"/>
             </svg>
@@ -836,6 +997,28 @@ html, body {
     </div>
 </div>
 
+<!-- File Detail View -->
+<div class="file-detail" id="fileDetail">
+    <div class="detail-header">
+        <div class="detail-header-inner">
+            <button class="btn btn-secondary btn-sm" onclick="hideFileDetail()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="19" y1="12" x2="5" y2="12"/>
+                    <polyline points="12 19 5 12 12 5"/>
+                </svg>
+                <span>Back</span>
+            </button>
+        </div>
+    </div>
+    <div class="detail-content">
+        <div class="detail-cover" id="detailCover"></div>
+        <div class="detail-title" id="detailTitle"></div>
+        <div class="detail-author" id="detailAuthor"></div>
+        <div class="detail-info" id="detailInfo"></div>
+        <div class="detail-actions" id="detailActions"></div>
+    </div>
+</div>
+
 <!-- Toast Container -->
 <div class="toast-container" id="toastContainer"></div>
 
@@ -852,6 +1035,8 @@ html, body {
     let modalCallback = null;
     let confirmCallback = null;
     let filterTimer = null;
+    let currentEntries = [];
+    let currentDetailEntry = null;
 
     // ===== Icons =====
     const icons = {
@@ -876,9 +1061,15 @@ html, body {
             opts.body = JSON.stringify(body);
         }
         const res = await fetch(url, opts);
-        const data = await res.json();
+        var text = await res.text();
+        var data;
+        try {
+            data = JSON.parse(text);
+        } catch (e) {
+            throw new Error(res.ok ? 'Invalid server response' : 'Server error (' + res.status + ')');
+        }
         if (!res.ok || data.error) {
-            throw new Error(data.error || 'Request failed');
+            throw new Error(data.error || 'Request failed (' + res.status + ')');
         }
         return data;
     }
@@ -928,6 +1119,7 @@ html, body {
     }
 
     function renderFiles(entries) {
+        currentEntries = entries || [];
         const list = document.getElementById('fileList');
         if (!entries || entries.length === 0) {
             list.innerHTML = '<div class="empty-state">' + icons.empty +
@@ -954,13 +1146,15 @@ html, body {
             if (typeLabel) html += '<span>' + escapeHtml(typeLabel) + '</span>';
             if (meta) html += '<span>' + meta + '</span>';
             html += '</div></div>';
-            html += '<div class="file-actions">';
-            if (!entry.is_dir) {
-                html += '<button class="btn-icon" onclick="event.stopPropagation(); downloadFile(\'' + escapeAttr(entry.path) + '\')" title="Download">' + icons.download + '</button>';
+            if (entry.is_dir) {
+                html += '<div class="file-actions">';
+                html += '<button class="btn-icon" onclick="event.stopPropagation(); renameItem(\'' + escapeAttr(entry.path) + '\', \'' + escapeAttr(entry.name) + '\')" title="Rename">' + icons.rename + '</button>';
+                html += '<button class="btn-icon" onclick="event.stopPropagation(); deleteItem(\'' + escapeAttr(entry.path) + '\', \'' + escapeAttr(entry.name) + '\', true)" title="Delete">' + icons.trash + '</button>';
+                html += '</div>';
+            } else {
+                html += '<div class="file-actions"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--text-tertiary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></div>';
             }
-            html += '<button class="btn-icon" onclick="event.stopPropagation(); renameItem(\'' + escapeAttr(entry.path) + '\', \'' + escapeAttr(entry.name) + '\')" title="Rename">' + icons.rename + '</button>';
-            html += '<button class="btn-icon" onclick="event.stopPropagation(); deleteItem(\'' + escapeAttr(entry.path) + '\', \'' + escapeAttr(entry.name) + '\', ' + (entry.is_dir ? 'true' : 'false') + ')" title="Delete">' + icons.trash + '</button>';
-            html += '</div></div>';
+            html += '</div>';
         }
         list.innerHTML = html;
     }
@@ -969,7 +1163,7 @@ html, body {
         if (isDir) {
             navigate(path);
         } else {
-            downloadFile(path);
+            showFileDetail(path);
         }
     };
 
@@ -1008,6 +1202,225 @@ html, body {
                 try {
                     await api('POST', '/api/delete', { path: path });
                     showToast('Deleted successfully', 'success');
+                    loadFiles();
+                } catch (err) {
+                    showToast('Delete failed: ' + err.message, 'error');
+                }
+            }
+        );
+    };
+
+    // ===== File Detail View =====
+    window.showFileDetail = function(path) {
+        var entry = null;
+        for (var i = 0; i < currentEntries.length; i++) {
+            if (currentEntries[i].path === path) {
+                entry = currentEntries[i];
+                break;
+            }
+        }
+        if (!entry) return;
+        currentDetailEntry = entry;
+
+        var detail = document.getElementById('fileDetail');
+        var coverEl = document.getElementById('detailCover');
+        var titleEl = document.getElementById('detailTitle');
+        var authorEl = document.getElementById('detailAuthor');
+        var infoEl = document.getElementById('detailInfo');
+        var actionsEl = document.getElementById('detailActions');
+
+        // Show the detail overlay and lock body scroll (iOS needs position:fixed)
+        detail.classList.add('open');
+        detail.style.display = 'block';
+        document.body.dataset.scrollY = window.scrollY;
+        document.body.style.position = 'fixed';
+        document.body.style.top = '-' + window.scrollY + 'px';
+        document.body.style.left = '0';
+        document.body.style.right = '0';
+        document.body.style.overflow = 'hidden';
+
+        // Show loading spinner in cover area
+        coverEl.innerHTML = '<div class="cover-spinner"></div>';
+
+        // Set title from filename (without extension)
+        var nameWithoutExt = entry.name.replace(/\.[^.]+$/, '') || entry.name;
+        titleEl.textContent = nameWithoutExt;
+
+        // Clear author initially
+        authorEl.textContent = '';
+        authorEl.style.display = 'none';
+
+        // File type info
+        var typeClass = entry.type || 'file';
+        var ext = entry.name.split('.').pop().toUpperCase();
+        var dateStr = entry.modified ? formatDate(entry.modified) : 'Unknown';
+        var sizeStr = entry.size_formatted || '0 B';
+
+        var infoHtml = '';
+        infoHtml += '<div class="detail-info-row"><span class="detail-info-label">File type</span><span class="detail-info-value">' + escapeHtml(ext) + '</span></div>';
+        infoHtml += '<div class="detail-info-row"><span class="detail-info-label">Size</span><span class="detail-info-value">' + escapeHtml(sizeStr) + '</span></div>';
+        infoHtml += '<div class="detail-info-row"><span class="detail-info-label">Modified</span><span class="detail-info-value">' + escapeHtml(dateStr) + '</span></div>';
+        infoEl.innerHTML = infoHtml;
+
+        // Build action buttons
+        var actHtml = '';
+        actHtml += '<button class="btn btn-primary" onclick="detailDownload()">' + icons.download + '<span>Download</span></button>';
+        actHtml += '<button class="btn btn-secondary" onclick="detailRename()">' + icons.rename + '<span>Rename</span></button>';
+        actHtml += '<button class="btn btn-danger" onclick="detailDelete()">' + icons.trash + '<span>Delete</span></button>';
+        actionsEl.innerHTML = actHtml;
+
+        // Fetch metadata asynchronously
+        fetch('/api/metadata?path=' + encodeURIComponent(path))
+            .then(function(res) { return res.json(); })
+            .then(function(meta) {
+                if (!currentDetailEntry || currentDetailEntry.path !== path) return;
+
+                // Update title if metadata has one
+                if (meta.title) {
+                    titleEl.textContent = meta.title;
+                }
+
+                // Show author if available
+                if (meta.author) {
+                    authorEl.textContent = meta.author;
+                    authorEl.style.display = 'block';
+                }
+
+                // Handle cover image
+                if (meta.has_cover) {
+                    var img = document.createElement('img');
+                    img.src = '/api/cover?path=' + encodeURIComponent(path);
+                    img.alt = 'Book cover';
+                    img.onerror = function() {
+                        coverEl.innerHTML = buildCoverPlaceholder(typeClass);
+                    };
+                    coverEl.innerHTML = '';
+                    coverEl.appendChild(img);
+                } else {
+                    coverEl.innerHTML = buildCoverPlaceholder(typeClass);
+                }
+            })
+            .catch(function() {
+                if (!currentDetailEntry || currentDetailEntry.path !== path) return;
+                coverEl.innerHTML = buildCoverPlaceholder(typeClass);
+            });
+    };
+
+    function buildCoverPlaceholder(typeClass) {
+        var icon = icons[typeClass] || icons.file;
+        return '<div class="cover-placeholder">' + icon + '</div>';
+    }
+
+    window.hideFileDetail = function() {
+        var detail = document.getElementById('fileDetail');
+        detail.classList.remove('open');
+        detail.style.display = 'none';
+        var scrollY = parseInt(document.body.dataset.scrollY || '0', 10);
+        document.body.style.position = '';
+        document.body.style.top = '';
+        document.body.style.left = '';
+        document.body.style.right = '';
+        document.body.style.overflow = '';
+        window.scrollTo(0, scrollY);
+        currentDetailEntry = null;
+    };
+
+    window.detailDownload = function() {
+        if (currentDetailEntry) {
+            downloadFile(currentDetailEntry.path);
+        }
+    };
+
+    window.detailRename = function() {
+        if (!currentDetailEntry) return;
+        var entry = currentDetailEntry;
+        var fullName = entry.name;
+        var dotIndex = fullName.lastIndexOf('.');
+        var namePart = dotIndex > 0 ? fullName.substring(0, dotIndex) : fullName;
+        var extPart = dotIndex > 0 ? fullName.substring(dotIndex) : '';
+
+        // Show the modal with extension suffix
+        var overlay = document.getElementById('modalOverlay');
+        var titleElem = document.getElementById('modalTitle');
+        var inputElem = document.getElementById('modalInput');
+        var confirmBtn = document.getElementById('modalConfirm');
+
+        titleElem.textContent = 'Rename';
+        confirmBtn.textContent = 'Rename';
+
+        // Wrap input with extension suffix
+        var inputParent = inputElem.parentNode;
+        var hasExtWrapper = inputParent.classList.contains('modal-input-with-ext');
+        if (extPart) {
+            if (!hasExtWrapper) {
+                var wrapper = document.createElement('div');
+                wrapper.className = 'modal-input-with-ext';
+                inputParent.insertBefore(wrapper, inputElem);
+                wrapper.appendChild(inputElem);
+                var extSpan = document.createElement('span');
+                extSpan.className = 'detail-ext-suffix';
+                extSpan.id = 'modalExtSuffix';
+                wrapper.appendChild(extSpan);
+            }
+            document.getElementById('modalExtSuffix').textContent = extPart;
+        } else if (hasExtWrapper) {
+            // Remove the wrapper if no extension
+            var wrapper = inputParent;
+            var grandParent = wrapper.parentNode;
+            grandParent.insertBefore(inputElem, wrapper);
+            wrapper.remove();
+        }
+
+        inputElem.value = namePart;
+        overlay.classList.add('open');
+        setTimeout(function() {
+            inputElem.focus();
+            inputElem.select();
+        }, 100);
+
+        modalCallback = async function(newName) {
+            if (!newName || (newName + extPart) === fullName) {
+                restoreModalInput();
+                return;
+            }
+            var finalName = newName + extPart;
+            try {
+                var parentPath = entry.path.substring(0, entry.path.lastIndexOf('/')) || '/';
+                var newPath = parentPath + '/' + finalName;
+                await api('POST', '/api/rename', { old_path: entry.path, new_path: newPath });
+                showToast('Renamed successfully', 'success');
+                restoreModalInput();
+                hideFileDetail();
+                loadFiles();
+            } catch (err) {
+                showToast('Rename failed: ' + err.message, 'error');
+                restoreModalInput();
+            }
+        };
+    };
+
+    function restoreModalInput() {
+        var inputElem = document.getElementById('modalInput');
+        var inputParent = inputElem.parentNode;
+        if (inputParent.classList.contains('modal-input-with-ext')) {
+            var grandParent = inputParent.parentNode;
+            grandParent.insertBefore(inputElem, inputParent);
+            inputParent.remove();
+        }
+    }
+
+    window.detailDelete = function() {
+        if (!currentDetailEntry) return;
+        var entry = currentDetailEntry;
+        showConfirm(
+            'Delete file',
+            'Are you sure you want to delete "' + escapeHtml(entry.name) + '"?',
+            'Delete',
+            async function() {
+                try {
+                    await api('POST', '/api/delete', { path: entry.path });
+                    showToast('Deleted successfully', 'success');
+                    hideFileDetail();
                     loadFiles();
                 } catch (err) {
                     showToast('Delete failed: ' + err.message, 'error');
@@ -1172,6 +1585,7 @@ html, body {
     window.hideModal = function() {
         document.getElementById('modalOverlay').classList.remove('open');
         modalCallback = null;
+        restoreModalInput();
     };
 
     window.closeModal = function(e) {
@@ -1180,10 +1594,9 @@ html, body {
 
     window.confirmModal = function() {
         const value = document.getElementById('modalInput').value.trim();
+        const cb = modalCallback;
         hideModal();
-        if (modalCallback) {
-            const cb = modalCallback;
-            modalCallback = null;
+        if (cb) {
             cb(value);
         }
     };
@@ -1207,10 +1620,9 @@ html, body {
     };
 
     window.doConfirm = function() {
+        const cb = confirmCallback;
         hideConfirm();
-        if (confirmCallback) {
-            const cb = confirmCallback;
-            confirmCallback = null;
+        if (cb) {
             cb();
         }
     };

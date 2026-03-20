@@ -8,6 +8,7 @@ local HttpServer = {
     _server_socket = nil,
     _running = false,
     _static_cache = {},
+    _fileops = nil,
 }
 
 function HttpServer:new(o)
@@ -18,6 +19,20 @@ function HttpServer:new(o)
 end
 
 function HttpServer:start()
+    -- Load FileOps eagerly so require failures are caught at startup, not per-request
+    local ok, result = pcall(require, "fileops")
+    if not ok then
+        -- Try loading relative to this file's directory
+        local plugin_dir = self:_getPluginDir()
+        ok, result = pcall(dofile, plugin_dir .. "/fileops.lua")
+    end
+    if not ok then
+        error("Could not load fileops module: " .. tostring(result))
+    end
+    self._fileops = result
+    self._fileops:setRootDir(self.root_dir)
+    logger.info("FileSync HTTP: fileops module loaded, root_dir =", self.root_dir)
+
     local server, err = socket.bind("*", self.port)
     if not server then
         error("Could not bind to port " .. self.port .. ": " .. tostring(err))
@@ -51,17 +66,21 @@ end
 function HttpServer:_poll()
     if not self._running or not self._server_socket then return end
 
-    -- Accept new connections (non-blocking)
-    local client = self._server_socket:accept()
-    if client then
+    -- Process up to 4 pending connections per cycle (browser may open several at once)
+    for _ = 1, 4 do
+        local client = self._server_socket:accept()
+        if not client then break end
+
         client:settimeout(5)
         local ok, err = pcall(function()
             self:_handleClient(client)
         end)
         if not ok then
             logger.warn("FileSync HTTP: Error handling client:", err)
+            -- Use _sendError (HTML) not _sendJSON here — if _sendJSON itself
+            -- is the thing that threw, calling it again would also fail silently
             pcall(function()
-                self:_sendError(client, 500, "Internal Server Error")
+                self:_sendError(client, 500, tostring(err))
             end)
         end
         pcall(function() client:close() end)
@@ -72,8 +91,10 @@ end
 
 function HttpServer:_handleClient(client)
     -- Read the request line
-    local request_line, err = client:receive("*l")
+    local request_line, recv_err = client:receive("*l")
     if not request_line then
+        logger.warn("FileSync HTTP: receive failed:", recv_err)
+        self:_sendError(client, 400, "Bad Request")
         return
     end
 
@@ -82,6 +103,7 @@ function HttpServer:_handleClient(client)
         self:_sendError(client, 400, "Bad Request")
         return
     end
+    logger.dbg("FileSync HTTP:", method, path)
 
     -- Read headers
     local headers = {}
@@ -151,7 +173,7 @@ function HttpServer:_route(client, method, path, query, headers, body)
             "Connection: close\r\n",
             "\r\n",
         })
-        client:send(resp)
+        self:_sendAll(client, resp)
         return
     end
 
@@ -169,10 +191,48 @@ function HttpServer:_route(client, method, path, query, headers, body)
 
     -- API routes
     if path:match("^/api/") then
-        local FileOps = require("fileops")
-        FileOps:setRootDir(self.root_dir)
+        local FileOps = self._fileops
 
-        if method == "GET" and path == "/api/files" then
+        -- Health check endpoint for debugging
+        if method == "GET" and path == "/api/health" then
+            self:_sendJSON(client, 200, {
+                status = "ok",
+                root_dir = self.root_dir,
+                fileops_loaded = FileOps ~= nil,
+            })
+            return
+        end
+
+        if not FileOps then
+            self:_sendJSON(client, 500, {error = "File operations module not loaded"})
+            return
+        end
+
+        if method == "GET" and path == "/api/metadata" then
+            local file_path = query.path
+            if not file_path then
+                self:_sendJSON(client, 400, {error = "Missing path parameter"})
+                return
+            end
+            local result, err_msg = FileOps:getMetadata(file_path)
+            if result then
+                self:_sendJSON(client, 200, result)
+            else
+                self:_sendJSON(client, 400, {error = err_msg or "Cannot get metadata"})
+            end
+
+        elseif method == "GET" and path == "/api/cover" then
+            local file_path = query.path
+            if not file_path then
+                self:_sendJSON(client, 400, {error = "Missing path parameter"})
+                return
+            end
+            local ok, err_msg = FileOps:getBookCover(client, file_path, self)
+            if not ok then
+                self:_sendJSON(client, 404, {error = err_msg or "Cover not found"})
+            end
+
+        elseif method == "GET" and path == "/api/files" then
             local dir = query.path or "/"
             local sort_by = query.sort or "name"
             local sort_order = query.order or "asc"
@@ -284,7 +344,7 @@ function HttpServer:_serveIndex(client)
         "\r\n",
         html,
     })
-    client:send(response)
+    self:_sendAll(client, response)
 end
 
 function HttpServer:_getPluginDir()
@@ -295,6 +355,23 @@ function HttpServer:_getPluginDir()
         return script_path:match("(.+)/[^/]+$") or "."
     end
     return "."
+end
+
+--- Send all data on a socket, handling partial sends
+function HttpServer:_sendAll(client, data)
+    local total = #data
+    local sent = 0
+    while sent < total do
+        local bytes, err, partial = client:send(data, sent + 1)
+        if bytes then
+            sent = bytes
+        elseif partial and partial > 0 then
+            sent = partial
+        else
+            return nil, err
+        end
+    end
+    return sent
 end
 
 function HttpServer:_sendJSON(client, status, data)
@@ -315,7 +392,7 @@ function HttpServer:_sendJSON(client, status, data)
         "\r\n",
         json_body,
     })
-    client:send(response)
+    self:_sendAll(client, response)
 end
 
 function HttpServer:_sendError(client, status, message)
@@ -328,7 +405,7 @@ function HttpServer:_sendError(client, status, message)
         "\r\n",
         body,
     })
-    client:send(response)
+    self:_sendAll(client, response)
 end
 
 --- Send raw response headers for file download (used by FileOps)
@@ -346,7 +423,7 @@ function HttpServer:sendResponseHeaders(client, status, headers_table)
         table.insert(parts, key .. ": " .. value .. "\r\n")
     end
     table.insert(parts, "\r\n")
-    client:send(table.concat(parts))
+    self:_sendAll(client, table.concat(parts))
 end
 
 function HttpServer:_urlDecode(str)
@@ -379,6 +456,9 @@ function HttpServer:_encodeJSON(value)
     elseif t == "boolean" then
         return value and "true" or "false"
     elseif t == "number" then
+        -- Guard against nan/inf which are not valid JSON
+        if value ~= value then return "0" end -- NaN
+        if value == math.huge or value == -math.huge then return "0" end
         return tostring(value)
     elseif t == "string" then
         return '"' .. self:_escapeJSONString(value) .. '"'
@@ -413,19 +493,32 @@ function HttpServer:_encodeJSON(value)
 end
 
 function HttpServer:_escapeJSONString(s)
-    local escape_map = {
-        ['"'] = '\\"',
-        ['\\'] = '\\\\',
-        ['/'] = '\\/',
-        ['\b'] = '\\b',
-        ['\f'] = '\\f',
-        ['\n'] = '\\n',
-        ['\r'] = '\\r',
-        ['\t'] = '\\t',
-    }
-    return s:gsub('["\\/\b\f\n\r\t]', escape_map):gsub("[\x00-\x1f]", function(c)
-        return string.format("\\u%04x", string.byte(c))
-    end)
+    local result = {}
+    for i = 1, #s do
+        local b = string.byte(s, i)
+        if b == 34 then         -- "
+            result[#result + 1] = '\\"'
+        elseif b == 92 then     -- \
+            result[#result + 1] = '\\\\'
+        elseif b == 47 then     -- /
+            result[#result + 1] = '\\/'
+        elseif b == 8 then      -- backspace
+            result[#result + 1] = '\\b'
+        elseif b == 12 then     -- form feed
+            result[#result + 1] = '\\f'
+        elseif b == 10 then     -- newline
+            result[#result + 1] = '\\n'
+        elseif b == 13 then     -- carriage return
+            result[#result + 1] = '\\r'
+        elseif b == 9 then      -- tab
+            result[#result + 1] = '\\t'
+        elseif b < 32 then      -- other control chars
+            result[#result + 1] = string.format("\\u%04x", b)
+        else
+            result[#result + 1] = string.char(b)
+        end
+    end
+    return table.concat(result)
 end
 
 --- Minimal JSON decoder
