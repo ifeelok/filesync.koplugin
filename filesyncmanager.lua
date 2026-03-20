@@ -7,7 +7,9 @@ local GestureRange = require("ui/gesturerange")
 local InfoMessage = require("ui/widget/infomessage")
 local InputContainer = require("ui/widget/container/inputcontainer")
 local NetworkMgr = require("ui/network/manager")
+local OverlapGroup = require("ui/widget/overlapgroup")
 local QRWidget = require("ui/widget/qrwidget")
+local RightContainer = require("ui/widget/container/rightcontainer")
 local Size = require("ui/size")
 local TextBoxWidget = require("ui/widget/textboxwidget")
 local TextWidget = require("ui/widget/textwidget")
@@ -388,10 +390,44 @@ function FileSyncManager:showQRCode()
         stop_button,
     }
 
+    -- X (close) button in the top-right corner
+    local close_button_text = TextWidget:new{
+        text = "\u{00D7}", -- multiplication sign as X
+        face = Font:getFace("infofont", 32),
+        fgcolor = Blitbuffer.COLOR_BLACK,
+    }
+    local close_button = FrameContainer:new{
+        bordersize = Size.border.button,
+        radius = Size.radius.button,
+        padding = Screen:scaleBySize(6),
+        padding_left = Screen:scaleBySize(12),
+        padding_right = Screen:scaleBySize(12),
+        background = Blitbuffer.COLOR_WHITE,
+        close_button_text,
+    }
+    local close_button_row = RightContainer:new{
+        dimen = { w = screen_width - Screen:scaleBySize(10), h = close_button:getSize().h + Screen:scaleBySize(10) },
+        FrameContainer:new{
+            bordersize = 0,
+            padding = 0,
+            padding_top = Screen:scaleBySize(10),
+            padding_right = Screen:scaleBySize(10),
+            background = Blitbuffer.COLOR_WHITE,
+            close_button,
+        },
+    }
+
     -- Center everything on screen
     local centered_content = CenterContainer:new{
         dimen = { w = screen_width, h = screen_height },
         vertical_content,
+    }
+
+    -- Layer the close button on top of centered content using OverlapGroup
+    local overlap = OverlapGroup:new{
+        dimen = { w = screen_width, h = screen_height },
+        centered_content,
+        close_button_row,
     }
 
     -- Full-screen white background container
@@ -402,7 +438,7 @@ function FileSyncManager:showQRCode()
         padding = 0,
         margin = 0,
         background = Blitbuffer.COLOR_WHITE,
-        centered_content,
+        overlap,
     }
 
     -- Build the InputContainer for handling taps
@@ -412,9 +448,9 @@ function FileSyncManager:showQRCode()
     }
     widget[1] = frame
 
-    -- Compute button geometry for hit testing
-    -- We store the button reference so we can check tap position later
+    -- Store button references for hit testing
     widget._stop_button = stop_button
+    widget._close_button = close_button
     widget._manager = self
 
     widget.ges_events = {
@@ -427,10 +463,12 @@ function FileSyncManager:showQRCode()
     }
 
     function widget:onTap(_, ges)
+        if not ges then return true end
+        local x, y = ges.pos.x, ges.pos.y
+
         -- Check if the tap is on the Stop Server button
         local btn = self._stop_button
-        if btn.dimen and ges then
-            local x, y = ges.pos.x, ges.pos.y
+        if btn.dimen then
             if x >= btn.dimen.x and x <= btn.dimen.x + btn.dimen.w
                and y >= btn.dimen.y and y <= btn.dimen.y + btn.dimen.h then
                 -- Stop button tapped: stop server and restart KOReader
@@ -440,13 +478,28 @@ function FileSyncManager:showQRCode()
                 return true
             end
         end
-        -- Tap elsewhere: dismiss QR screen, keep server running
-        self._manager:closeQRScreen()
+
+        -- Check if the tap is on the X close button
+        local close_btn = self._close_button
+        if close_btn.dimen then
+            if x >= close_btn.dimen.x and x <= close_btn.dimen.x + close_btn.dimen.w
+               and y >= close_btn.dimen.y and y <= close_btn.dimen.y + close_btn.dimen.h then
+                -- X button tapped: dismiss QR screen, show info, keep server running
+                self._manager:closeQRScreen()
+                UIManager:show(InfoMessage:new{
+                    text = _("Server running in the background. Stop the server to save battery."),
+                    timeout = 4,
+                })
+                return true
+            end
+        end
+
+        -- Tap anywhere else: do nothing (no dismiss)
         return true
     end
 
     function widget:onClose()
-        self._manager:closeQRScreen()
+        -- Only dismiss via X button, not via generic close/back key
         return true
     end
 
