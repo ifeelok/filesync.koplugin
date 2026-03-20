@@ -73,7 +73,7 @@ function FileSync:addToMainMenu(menu_items)
                     local UIManager = require("ui/uimanager")
                     local InfoMessage = require("ui/widget/infomessage")
                     UIManager:show(InfoMessage:new{
-                        text = _("FileSync v1.0.0\n\nWireless file manager for KOReader.\n\nStart the server, scan the QR code with your phone, and manage your books from any browser on the same WiFi network."),
+                        text = _("FileSync v1.0.0\n\nWireless file manager for KOReader.\n\nStart the server, scan the QR code with your phone, and manage your books from any browser on the same WiFi network.\n\nProject:\ngithub.com/abrahamnm/filesync.koplugin"),
                     })
                 end,
                 keep_menu_open = true,
