@@ -20,7 +20,7 @@ local VerticalSpan = require("ui/widget/verticalspan")
 local Font = require("ui/font")
 local logger = require("logger")
 local Screen = Device.screen
-local ok_i18n, plugin_gettext = pcall(require, "filesync_i18n")
+local ok_i18n, plugin_gettext = pcall(require, "filesync/filesync_i18n")
 local _ = ok_i18n and plugin_gettext or require("gettext")
 local T = require("ffi/util").template
 
@@ -200,7 +200,7 @@ function FileSyncManager:start(silent)
     local root_dir = self:getRootDir()
 
     -- Start the HTTP server
-    local HttpServer = require("httpserver")
+    local HttpServer = require("filesync/httpserver")
     local ok, err = pcall(function()
         self._server = HttpServer:new{
             port = port,

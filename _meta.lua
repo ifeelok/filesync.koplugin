@@ -1,6 +1,6 @@
 local _ = require("gettext")
 return {
-    name = "FileSync",
+    name = "filesync",
     fullname = _("FileSync - Wireless File Manager"),
     description = _([[Launches a local HTTP web server and displays a QR code. Scan with your phone to manage books and files on your device wirelessly through a clean web interface.]]),
 }

@@ -20,7 +20,7 @@ end
 
 function HttpServer:start()
     -- Load FileOps eagerly so require failures are caught at startup, not per-request
-    local ok, result = pcall(require, "fileops")
+    local ok, result = pcall(require, "filesync/fileops")
     if not ok then
         -- Try loading relative to this file's directory
         local plugin_dir = self:_getPluginDir()
@@ -192,7 +192,7 @@ function HttpServer:_route(client, method, path, query, headers, body)
     -- API routes
     if path:match("^/api/") then
         local FileOps = self._fileops
-        local FileSyncManager = require("filesyncmanager")
+        local FileSyncManager = require("filesync/filesyncmanager")
         local safe_mode = FileSyncManager:getSafeMode()
 
         -- Language endpoint for web UI i18n

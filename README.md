@@ -14,13 +14,11 @@ Works on **Kindle** and **Kobo** devices running KOReader.
 - **Rename & Delete** — Full file management with confirmation dialogs
 - **Search & Sort** — Filter by name, sort by name/size/date/type
 - **Responsive UI** — Designed for smartphones, works on any screen
-- **Zero Dependencies** — Pure Lua server, self-contained HTML interface
-- **Secure** — Path traversal protection, input sanitization, local network only
 
 ## How It Works
 
 1. Connect your e-reader to WiFi
-2. Open the FileSync plugin from KOReader's Tools menu
+2. Open the FileSync plugin from KOReader's Network Tools menu
 3. A QR code appears on the e-reader screen
 4. Scan it with your phone (connected to the same WiFi)
 5. Manage your books from the web interface in your phone's browser
@@ -46,12 +44,17 @@ Works on **Kindle** and **Kobo** devices running KOReader.
    ├── FileSync.koplugin/
    │   ├── _meta.lua
    │   ├── main.lua
-   │   ├── filesyncmanager.lua
-   │   ├── httpserver.lua
-   │   ├── fileops.lua
-   │   ├── qrcode.lua
-   │   └── static/
-   │       └── index.html
+   │   └── filesync/
+   │       ├── filesyncmanager.lua
+   │       ├── httpserver.lua
+   │       ├── fileops.lua
+   │       ├── filesync_i18n.lua
+   │       ├── qrcode.lua
+   │       ├── static/
+   │       │   └── index.html
+   │       └── i18n/
+   │           ├── en.po
+   │           └── es.po
    ├── other.koplugin/
    └── ...
    ```
@@ -65,33 +68,11 @@ Works on **Kindle** and **Kobo** devices running KOReader.
 3. Copy the `FileSync.koplugin` folder to your device's KOReader plugins directory (see paths above)
 4. Restart KOReader
 
-### Building from Source
-
-Clone the repository and package the plugin:
-
-```bash
-git clone https://github.com/yourusername/FileSync.koplugin.git
-cd FileSync.koplugin
-
-# Create a distributable archive (exclude dev files)
-mkdir -p dist
-zip -r dist/FileSync.koplugin.zip \
-  _meta.lua \
-  main.lua \
-  filesyncmanager.lua \
-  httpserver.lua \
-  fileops.lua \
-  qrcode.lua \
-  static/index.html
-```
-
-Then copy `dist/FileSync.koplugin.zip` to your device, extract it into the plugins directory, and restart KOReader.
-
 ### Verifying Installation
 
 After restarting KOReader, open the top menu and navigate to:
 
-**Network → FileSync - Wireless File Manager**
+**Network → FileSync**
 
 If you see the menu entry, the plugin is installed correctly.
 
@@ -99,8 +80,9 @@ If you see the menu entry, the plugin is installed correctly.
 
 ### Starting the Server
 
+0. Make sure you're device is connected to WiFi
 1. Open KOReader's top menu
-2. Navigate to **Network → FileSync - Wireless File Manager**
+2. Navigate to **Network → FileSync**
 3. Tap **Start file server**
 4. A QR code will appear on screen with the connection URL
 
@@ -136,79 +118,6 @@ If you see the menu entry, the plugin is installed correctly.
 3. Enter a port number between 1024 and 65535 (default: 8080)
 4. Restart the server for the change to take effect
 
-## Configuration
-
-| Setting | Default | Range | Persisted |
-|---------|---------|-------|-----------|
-| Server port | `8080` | 1024–65535 | Yes |
-
-Settings are stored in KOReader's configuration and persist across restarts.
-
-## Device Storage Paths
-
-The plugin automatically detects the correct root directory for file operations:
-
-| Device | Root Path |
-|--------|-----------|
-| Kindle | `/mnt/us` |
-| Kobo | `/mnt/onboard` |
-| PocketBook | `/mnt/ext1` |
-| Android | External storage |
-
-## API Reference
-
-The plugin exposes a REST-like HTTP API for programmatic access:
-
-| Endpoint | Method | Parameters | Description |
-|----------|--------|------------|-------------|
-| `/api/files` | GET | `path`, `sort`, `order`, `filter` | List directory contents |
-| `/api/download` | GET | `path` | Download a file |
-| `/api/upload` | POST | `path` (query), multipart body | Upload files |
-| `/api/mkdir` | POST | `{"path": "/new/folder"}` | Create directory |
-| `/api/rename` | POST | `{"old_path": "/a", "new_path": "/b"}` | Rename file/folder |
-| `/api/delete` | POST | `{"path": "/file/to/delete"}` | Delete file/folder |
-
-### Example: List Files
-
-```bash
-curl http://<device-ip>:8080/api/files?path=/&sort=name&order=asc
-```
-
-### Example: Upload a Book
-
-```bash
-curl -F "file=@mybook.epub" http://<device-ip>:8080/api/upload?path=/Books
-```
-
-## Security
-
-- **Local network only** — The server binds to the device's local IP, not accessible from the internet
-- **Path traversal protection** — All paths are validated to stay within the device's storage root
-- **Input sanitization** — Filenames are validated for null bytes, path separators, and length limits
-- **Kindle firewall** — Automatically opens/closes the required port via iptables on Kindle devices
-- **No authentication** — Since this runs on a trusted local network, no auth is required. Do not expose the port to the internet.
-
-## Architecture
-
-```
-FileSync.koplugin/
-├── _meta.lua              Plugin metadata (name, description)
-├── main.lua               Entry point, menu registration, lifecycle hooks
-├── filesyncmanager.lua    Server orchestration, WiFi/IP detection, QR display
-├── httpserver.lua         Non-blocking HTTP/1.1 server (LuaSocket)
-├── fileops.lua            File CRUD operations with security validation
-├── qrcode.lua             QR code generation fallback module
-└── static/
-    └── index.html         Self-contained web UI (HTML + CSS + JS)
-```
-
-### Key Design Decisions
-
-- **Non-blocking server** — Uses `UIManager:scheduleIn()` to poll for connections without freezing the KOReader UI
-- **Single-file web UI** — All CSS and JS are inlined in `index.html` to avoid multiple HTTP requests and external dependencies
-- **Pure Lua** — No compiled binaries or external tools required, ensuring compatibility across all KOReader-supported devices
-- **Suspend-aware** — Server automatically stops on device suspend and restarts on wake to conserve battery
-
 ## Troubleshooting
 
 **Plugin doesn't appear in the menu**
@@ -233,7 +142,7 @@ FileSync.koplugin/
 
 ## Contributing
 
-Contributions are welcome! This plugin lives outside the official KOReader repository (upstream considers HTTP file servers out of scope).
+Contributions are welcome!
 
 1. Fork the repository
 2. Create a feature branch

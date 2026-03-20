@@ -1,9 +1,9 @@
 local WidgetContainer = require("ui/widget/container/widgetcontainer")
-local ok_i18n, plugin_gettext = pcall(require, "filesync_i18n")
+local ok_i18n, plugin_gettext = pcall(require, "filesync/filesync_i18n")
 local _ = ok_i18n and plugin_gettext or require("gettext")
 
 local FileSync = WidgetContainer:extend{
-    name = "FileSync",
+    name = "filesync",
     is_doc_only = false,
 }
 
@@ -18,7 +18,7 @@ function FileSync:addToMainMenu(menu_items)
         sub_item_table = {
             {
                 text_func = function()
-                    local FileSyncManager = require("filesyncmanager")
+                    local FileSyncManager = require("filesync/filesyncmanager")
                     if FileSyncManager:isRunning() then
                         return _("Stop file server")
                     else
@@ -26,7 +26,7 @@ function FileSync:addToMainMenu(menu_items)
                     end
                 end,
                 callback = function()
-                    local FileSyncManager = require("filesyncmanager")
+                    local FileSyncManager = require("filesync/filesyncmanager")
                     if FileSyncManager:isRunning() then
                         FileSyncManager:stop()
                     else
@@ -38,7 +38,7 @@ function FileSync:addToMainMenu(menu_items)
             {
                 text = _("Server port"),
                 callback = function()
-                    local FileSyncManager = require("filesyncmanager")
+                    local FileSyncManager = require("filesync/filesyncmanager")
                     FileSyncManager:configurePort()
                 end,
                 keep_menu_open = true,
@@ -46,11 +46,11 @@ function FileSync:addToMainMenu(menu_items)
             {
                 text = _("Safe mode"),
                 checked_func = function()
-                    local FileSyncManager = require("filesyncmanager")
+                    local FileSyncManager = require("filesync/filesyncmanager")
                     return FileSyncManager:getSafeMode()
                 end,
                 callback = function()
-                    local FileSyncManager = require("filesyncmanager")
+                    local FileSyncManager = require("filesync/filesyncmanager")
                     FileSyncManager:setSafeMode(not FileSyncManager:getSafeMode())
                 end,
                 keep_menu_open = true,
@@ -58,11 +58,11 @@ function FileSync:addToMainMenu(menu_items)
             {
                 text = _("Show QR code"),
                 enabled_func = function()
-                    local FileSyncManager = require("filesyncmanager")
+                    local FileSyncManager = require("filesync/filesyncmanager")
                     return FileSyncManager:isRunning()
                 end,
                 callback = function()
-                    local FileSyncManager = require("filesyncmanager")
+                    local FileSyncManager = require("filesync/filesyncmanager")
                     FileSyncManager:showQRCode()
                 end,
                 keep_menu_open = false,
@@ -83,7 +83,7 @@ function FileSync:addToMainMenu(menu_items)
 end
 
 function FileSync:onSuspend()
-    local FileSyncManager = require("filesyncmanager")
+    local FileSyncManager = require("filesync/filesyncmanager")
     if FileSyncManager:isRunning() then
         FileSyncManager._was_running_before_suspend = true
         FileSyncManager:stop(true) -- silent stop
@@ -91,7 +91,7 @@ function FileSync:onSuspend()
 end
 
 function FileSync:onResume()
-    local FileSyncManager = require("filesyncmanager")
+    local FileSyncManager = require("filesync/filesyncmanager")
     if FileSyncManager._was_running_before_suspend then
         FileSyncManager._was_running_before_suspend = false
         FileSyncManager:start(true) -- silent start (no QR code)
@@ -107,7 +107,7 @@ function FileSync:onLeaveStandby()
 end
 
 function FileSync:onExit()
-    local FileSyncManager = require("filesyncmanager")
+    local FileSyncManager = require("filesync/filesyncmanager")
     if FileSyncManager:isRunning() then
         FileSyncManager:stop(true)
     end
