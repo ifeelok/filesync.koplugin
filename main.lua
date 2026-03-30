@@ -1,3 +1,4 @@
+local Dispatcher = require("dispatcher")
 local WidgetContainer = require("ui/widget/container/widgetcontainer")
 local ok_i18n, plugin_gettext = pcall(require, "filesync/filesync_i18n")
 local _ = ok_i18n and plugin_gettext or require("gettext")
@@ -11,7 +12,17 @@ local FileSync = WidgetContainer:extend{
     is_doc_only = false,
 }
 
+function FileSync:onDispatcherRegisterActions()
+    Dispatcher:registerAction("toggle_filesync_server", {
+        category = "none",
+        event = "ToggleFileSyncServer",
+        title = _("Toggle FileSync server"),
+        general = true,
+    })
+end
+
 function FileSync:init()
+    self:onDispatcherRegisterActions()
     self.ui.menu:registerToMainMenu(self)
 end
 
@@ -30,12 +41,7 @@ function FileSync:addToMainMenu(menu_items)
                     end
                 end,
                 callback = function()
-                    local FileSyncManager = require("filesync/filesyncmanager")
-                    if FileSyncManager:isRunning() then
-                        FileSyncManager:stop()
-                    else
-                        FileSyncManager:checkBatteryAndStart()
-                    end
+                    self:onToggleFileSyncServer()
                 end,
                 keep_menu_open = false,
             },
@@ -93,6 +99,24 @@ function FileSync:addToMainMenu(menu_items)
             },
         },
     }
+end
+
+function FileSync:onToggleFileSyncServer()
+    local FileSyncManager = require("filesync/filesyncmanager")
+    if FileSyncManager:isRunning() then
+        local InfoMessage = require("ui/widget/infomessage")
+        local UIManager = require("ui/uimanager")
+        UIManager:show(InfoMessage:new{
+            text = _("Stopping server..."),
+            timeout = 2,
+        })
+        UIManager:scheduleIn(0.5, function()
+            FileSyncManager:stop(true)
+            UIManager:restartKOReader()
+        end)
+    else
+        FileSyncManager:checkBatteryAndStart()
+    end
 end
 
 function FileSync:onSuspend()
